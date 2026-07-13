@@ -1,0 +1,23 @@
+# Maven
+target/
+*.class
+
+# Eclipse
+.classpath
+.project
+.settings/
+bin/
+
+# IntelliJ (por si acaso)
+.idea/
+*.iml
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Variables de entorno / secretos (por si en el futuro uso un .env)
+.env
+
+# Capturas de pantalla para LinkedIn, no forman parte del proyecto
+Capturas proyecto/
