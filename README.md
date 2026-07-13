@@ -1,17 +1,27 @@
 # Training Microservices
 
-Sistema de seguimiento de entrenamientos construido con arquitectura de microservicios
-(Spring Boot, MySQL, Docker Compose). Gestiona usuarios, entrenamientos y marcas personales de peso.
+![Java](https://img.shields.io/badge/Java-21-orange)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.16-brightgreen)
+![Docker](https://img.shields.io/badge/Docker-Compose-blue)
+![MySQL](https://img.shields.io/badge/MySQL-8-lightblue)
+![Maven](https://img.shields.io/badge/Maven-Build-red)
+
+Sistema de seguimiento de entrenamientos construido con arquitectura de microservicios (Spring Boot, MySQL, Docker Compose). Gestiona usuarios, entrenamientos y récords personales.
+
+## Objetivo del proyecto
+
+Este proyecto ha sido desarrollado como proyecto personal para practicar una arquitectura de microservicios real con Spring Boot. El objetivo no es construir una aplicación completa de cara a producción, sino aplicar conceptos que se usan en proyectos reales: separación de dominios, bases de datos independientes por servicio, y comunicación HTTP entre servicios.
+
+## Estructura del proyecto:
+training-microservices/
+├── usuarios-service/
+├── entrenamientos-service/
+├── docker-compose.yml
+└── README.md
 
 ## Arquitectura
 
-El sistema está compuesto por dos microservicios independientes,
-cada uno con su propia base de datos MySQL, que se comunican entre sí mediante HTTP (RestClient):
-
-## Arquitectura
-
-El sistema está compuesto por dos microservicios independientes, cada uno con su propia base de datos MySQL,
-que se comunican entre sí mediante HTTP (RestClient):
+El sistema está compuesto por dos microservicios independientes, cada uno con su propia base de datos MySQL, que se comunican entre sí mediante HTTP (RestClient):
 
 ```mermaid
 flowchart TB
@@ -28,16 +38,18 @@ flowchart TB
     ES --> DBE
 ```
 
-`entrenamientos-service` valida contra `usuarios-service` que un usuario existe antes de crear un registro de entrenamiento
-o un récord personal (PR). Cada base de datos es completamente independiente: no hay claves foráneas entre servicios,
-solo referencias por id validadas vía HTTP.
+`entrenamientos-service` valida contra `usuarios-service` que un usuario existe antes de crear un registro de entrenamiento o un récord personal (PR). Cada base de datos es completamente independiente: no hay claves foráneas entre servicios, solo referencias por id validadas vía HTTP.
 
+## Decisiones de diseño
 
-`entrenamientos-service` valida contra `usuarios-service` que un usuario existe antes de crear un registro de entrenamiento
-o un récord personal (PR). 
-Cada base de datos es completamente independiente: no hay claves foráneas entre servicios, solo referencias por id validadas vía HTTP.
+- Una base de datos MySQL independiente por microservicio, sin acceso cruzado.
+- Comunicación síncrona entre servicios mediante RestClient (Spring 6.1+).
+- Validación del usuario contra usuarios-service antes de crear cualquier recurso que dependa de él.
+- Los campos usuarioId en Registro y PR son referencias sueltas (Long), no claves foráneas: JPA no puede hacer JOIN entre bases de datos distintas.
+- DTOs específicos por endpoint en lugar de exponer las entidades JPA directamente en la API.
+- Manejo de errores centralizado con @RestControllerAdvice, distinguiendo entre "recurso no encontrado" (404) y "servicio externo no disponible" (503).
 
-## Stack tecnológico usado:
+## Stack tecnológico
 
 - Java 21
 - Spring Boot 3.5.16
@@ -48,7 +60,6 @@ Cada base de datos es completamente independiente: no hay claves foráneas entre
 - Docker / Docker Compose
 - Maven
 - Lombok
-- Eclipse IDE / VS Code
 
 ## Servicios
 
@@ -58,14 +69,14 @@ Gestiona los usuarios y su perfil físico (peso, altura, histórico).
 
 | Método | Endpoint | Descripción |
 |---|---|---|
-| POST | `/usuarios` | Crea un usuario |
-| GET | `/usuarios/{id}` | Consulta un usuario |
-| GET | `/usuarios` | Lista todos los usuarios |
-| PUT | `/usuarios/{id}` | Actualiza un usuario |
-| DELETE | `/usuarios/{id}` | Elimina un usuario |
-| GET | `/usuarios/{id}/existe` | Comprueba si un usuario existe (uso interno, consumido por entrenamientos-service) |
-| POST | `/perfiles` | Crea un registro de perfil físico |
-| GET | `/perfiles/usuario/{usuarioId}` | Historial de perfil físico de un usuario |
+| POST | /usuarios | Crea un usuario |
+| GET | /usuarios/{id} | Consulta un usuario |
+| GET | /usuarios | Lista todos los usuarios |
+| PUT | /usuarios/{id} | Actualiza un usuario |
+| DELETE | /usuarios/{id} | Elimina un usuario |
+| GET | /usuarios/{id}/existe | Comprueba si un usuario existe (uso interno, consumido por entrenamientos-service) |
+| POST | /perfiles | Crea un registro de perfil físico |
+| GET | /perfiles/usuario/{usuarioId} | Historial de perfil físico de un usuario |
 
 ### entrenamientos-service (puerto 8082)
 
@@ -73,82 +84,88 @@ Gestiona ejercicios, entrenamientos, registros de entrenamiento y récords perso
 
 | Método | Endpoint | Descripción |
 |---|---|---|
-| POST | `/ejercicios` | Crea un ejercicio |
-| GET | `/ejercicios/{id}` | Consulta un ejercicio |
-| GET | `/ejercicios` | Lista todos los ejercicios |
-| POST | `/entrenamientos` | Crea un entrenamiento |
-| GET | `/entrenamientos/{id}` | Consulta un entrenamiento |
-| GET | `/entrenamientos` | Lista todos los entrenamientos |
-| GET | `/entrenamientos/hoy` | Entrenamientos programados para hoy |
-| POST | `/entrenamiento-ejercicios` | Añade un ejercicio a un entrenamiento |
-| GET | `/entrenamiento-ejercicios/entrenamiento/{id}` | Ejercicios de un entrenamiento |
-| POST | `/registros` | Crea un registro de entrenamiento (valida el usuario vía HTTP) |
-| GET | `/registros/usuario/{usuarioId}` | Historial de entrenamientos de un usuario |
-| POST | `/prs` | Registra un nuevo récord personal (solo si supera el anterior) |
-| GET | `/prs/usuario/{usuarioId}` | Evolución de récords personales de un usuario |
+| POST | /ejercicios | Crea un ejercicio |
+| GET | /ejercicios/{id} | Consulta un ejercicio |
+| GET | /ejercicios | Lista todos los ejercicios |
+| POST | /entrenamientos | Crea un entrenamiento |
+| GET | /entrenamientos/{id} | Consulta un entrenamiento |
+| GET | /entrenamientos | Lista todos los entrenamientos |
+| GET | /entrenamientos/hoy | Entrenamientos programados para hoy |
+| POST | /entrenamiento-ejercicios | Añade un ejercicio a un entrenamiento |
+| GET | /entrenamiento-ejercicios/entrenamiento/{id} | Ejercicios de un entrenamiento |
+| POST | /registros | Crea un registro de entrenamiento (valida el usuario vía HTTP) |
+| GET | /registros/usuario/{usuarioId} | Historial de entrenamientos de un usuario |
+| POST | /prs | Registra un nuevo récord personal (solo si supera el anterior) |
+| GET | /prs/usuario/{usuarioId} | Evolución de récords personales de un usuario |
 
 ## Cómo levantarlo en local
 
-**Requisitos:** Docker Desktop, Java 21, Maven (o el wrapper incluido `mvnw`)
+Requisitos: Docker Desktop, Java 21, Maven (o el wrapper incluido mvnw)
 
 1. Clona el repositorio:
-```bash
+
 git clone https://github.com/AirooSs/training-microservices.git
 cd training-microservices
-```
 
 2. Levanta las bases de datos MySQL con Docker Compose:
-```bash
-docker compose up -d
-```
 
-3. Arranca `usuarios-service` (puerto 8081):
-```bash
+docker compose up -d
+
+3. Arranca usuarios-service (puerto 8081):
+
 cd usuarios-service
 ./mvnw spring-boot:run
-```
 
-4. En otra terminal, arranca `entrenamientos-service` (puerto 8082):
-```bash
+4. En otra terminal, arranca entrenamientos-service (puerto 8082):
+
 cd entrenamientos-service
 ./mvnw spring-boot:run
-```
 
-5. Ambos servicios generan sus tablas automáticamente al arrancar (Hibernate `ddl-auto=update`),
-   no hace falta ejecutar ningún script SQL manual.
+5. Ambos servicios generan sus tablas automáticamente al arrancar (Hibernate ddl-auto=update), no hace falta ejecutar ningún script SQL manual.
 
 ## Modelo de datos
 
 El modelo se divide en dos bases de datos independientes:
 
-**usuarios_db**
-- `Usuario`: datos básicos del usuario
-- `PerfilFisico`: histórico de peso y altura (relación 1:N con Usuario)
+usuarios_db
+- Usuario: datos básicos del usuario
+- PerfilFisico: histórico de peso y altura (relación 1:N con Usuario)
 
-**entrenamientos_db**
-- `Ejercicio`: catálogo de ejercicios (clasificados por patrón de movimiento: empuje, tracción, pierna)
-- `Entrenamiento`: sesiones de entrenamiento (fuerza, hipertrofia o cardio)
-- `EntrenamientoEjercicio`: tabla intermedia que resuelve la relación N:M entre Entrenamiento y Ejercicio
-- `Registro`: resultado de un usuario en un entrenamiento concreto
-- `PR`: récord personal de un usuario en un ejercicio (peso máximo levantado)
-
-**Decisión de diseño clave:** los campos `usuarioId` en `Registro` y `PR` no son claves foráneas reales
-(JPA no puede hacer JOIN entre dos bases de datos distintas).
-Son referencias sueltas (`Long`) que se validan mediante una llamada HTTP a `usuarios-service` antes de guardar cualquier registro.
+entrenamientos_db
+- Ejercicio: catálogo de ejercicios (clasificados por patrón de movimiento: empuje, tracción, pierna)
+- Entrenamiento: sesiones de entrenamiento (fuerza, hipertrofia o cardio)
+- EntrenamientoEjercicio: tabla intermedia que resuelve la relación N:M entre Entrenamiento y Ejercicio
+- Registro: resultado de un usuario en un entrenamiento concreto
+- PR: récord personal de un usuario en un ejercicio (peso máximo levantado)
 
 ## Testing
 
-Probado manualmente de extremo a extremo con Postman: creación de usuarios y perfiles, creación de ejercicios y entrenamientos,
-comunicación HTTP real entre microservicios (validación de usuario existente),
-y lógica de negocio de récords personales (rechazo de un peso que no supera el récord actual).
+Probado manualmente de extremo a extremo con Postman: creación de usuarios y perfiles, creación de ejercicios y entrenamientos, comunicación HTTP real entre microservicios (validación de usuario existente), y lógica de negocio de récords personales (rechazo de un peso que no supera el récord actual).
 
-## Próximas mejoras posibles:
+## Lo aprendido
 
-- Tests de integración automatizados con Testcontainers
-- Spring Cloud Gateway como punto de entrada único
-- Autenticación JWT
-- Service discovery con Eureka
-- Comunicación asíncrona con eventos (Kafka o RabbitMQ) para desacoplar aún más los servicios
+Durante este proyecto he practicado:
+
+- Diseño y desarrollo de microservicios con Spring Boot
+- Comunicación HTTP síncrona entre servicios con RestClient
+- Diseño de bases de datos independientes por dominio
+- Validaciones cruzadas entre servicios
+- JPA / Hibernate, incluyendo relaciones N:M con tabla intermedia
+- Manejo de errores centralizado en una API REST
+- Uso de DTOs para desacoplar la API del modelo de datos interno
+- Orquestación de contenedores con Docker Compose
+
+## Roadmap
+
+- [x] Comunicación HTTP entre microservicios
+- [x] Docker Compose con bases de datos independientes
+- [x] Manejo de errores centralizado
+- [ ] Documentación OpenAPI / Swagger
+- [ ] Tests de integración con Testcontainers
+- [ ] Spring Cloud Gateway
+- [ ] Autenticación JWT
+- [ ] Service discovery con Eureka
+- [ ] Comunicación asíncrona con eventos (Kafka o RabbitMQ)
 
 ## Autor
 
