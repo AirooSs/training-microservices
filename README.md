@@ -10,14 +10,16 @@ Sistema de seguimiento de entrenamientos construido con arquitectura de microser
 
 ## Objetivo del proyecto
 
-Este proyecto ha sido desarrollado como proyecto personal para practicar una arquitectura de microservicios real con Spring Boot. El objetivo no es construir una aplicación completa de cara a producción, sino aplicar conceptos que se usan en proyectos reales: separación de dominios, bases de datos independientes por servicio, y comunicación HTTP entre servicios.
+Este proyecto ha sido desarrollado como proyecto personal para practicar una arquitectura basada en principios utilizados en entornos reales con Spring Boot. El objetivo no es construir una aplicación completa de cara a producción, sino aplicar conceptos que se usan en proyectos reales: separación de dominios, bases de datos independientes por servicio, y comunicación HTTP entre servicios.
 
 ## Estructura del proyecto:
+'''
 training-microservices/
 ├── usuarios-service/
 ├── entrenamientos-service/
 ├── docker-compose.yml
 └── README.md
+'''
 
 ## Arquitectura
 
@@ -43,7 +45,7 @@ flowchart TB
 ## Decisiones de diseño
 
 - Una base de datos MySQL independiente por microservicio, sin acceso cruzado.
-- Comunicación síncrona entre servicios mediante RestClient (Spring 6.1+).
+- Para simplificar el proyecto se ha optado por comunicación síncrona mediante HTTP. En sistemas con mayor volumen podrían emplearse        eventos mediante Kafka o RabbitMQ.
 - Validación del usuario contra usuarios-service antes de crear cualquier recurso que dependa de él.
 - Los campos usuarioId en Registro y PR son referencias sueltas (Long), no claves foráneas: JPA no puede hacer JOIN entre bases de datos distintas.
 - DTOs específicos por endpoint en lugar de exponer las entidades JPA directamente en la API.
@@ -98,6 +100,8 @@ Gestiona ejercicios, entrenamientos, registros de entrenamiento y récords perso
 | POST | /prs | Registra un nuevo récord personal (solo si supera el anterior) |
 | GET | /prs/usuario/{usuarioId} | Evolución de récords personales de un usuario |
 
+Nota: Se expone un endpoint específico para comprobar la existencia de un usuario y evitar acoplar el servicio consumidor a la representación completa del recurso. De este modo, entrenamientos-service solo necesita conocer si el usuario existe, no sus datos.
+
 ## Cómo levantarlo en local
 
 Requisitos: Docker Desktop, Java 21, Maven (o el wrapper incluido mvnw)
@@ -121,7 +125,7 @@ cd usuarios-service
 cd entrenamientos-service
 ./mvnw spring-boot:run
 
-5. Ambos servicios generan sus tablas automáticamente al arrancar (Hibernate ddl-auto=update), no hace falta ejecutar ningún script SQL manual.
+5. Ambos servicios generan sus tablas automáticamente mediante spring.jpa.hibernate.ddl-auto=update, una configuración adecuada para desarrollo. En entornos de producción sería recomendable utilizar herramientas de migración como Flyway o Liquibase.
 
 ## Modelo de datos
 
@@ -140,7 +144,7 @@ entrenamientos_db
 
 ## Testing
 
-Probado manualmente de extremo a extremo con Postman: creación de usuarios y perfiles, creación de ejercicios y entrenamientos, comunicación HTTP real entre microservicios (validación de usuario existente), y lógica de negocio de récords personales (rechazo de un peso que no supera el récord actual).
+Actualmente dispone de pruebas funcionales manuales mediante Postman. Los tests automatizados forman parte del roadmap: creación de usuarios y perfiles, creación de ejercicios y entrenamientos, comunicación HTTP real entre microservicios (validación de usuario existente), y lógica de negocio de récords personales (rechazo de un peso que no supera el récord actual).
 
 ## Lo aprendido
 
