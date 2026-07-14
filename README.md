@@ -159,7 +159,7 @@ Durante este proyecto he practicado:
 - Uso de DTOs para desacoplar la API del modelo de datos interno
 - Orquestación de contenedores con Docker Compose
 
-## Roadmap
+## Roadmap (lo no marcado son posibles implementaciones futuras)
 
 - [x] Comunicación HTTP entre microservicios
 - [x] Docker Compose con bases de datos independientes
