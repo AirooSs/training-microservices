@@ -1,26 +1,3 @@
-# Training Microservices
-
-![Java](https://img.shields.io/badge/Java-21-orange)
-![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.16-brightgreen)
-![Docker](https://img.shields.io/badge/Docker-Compose-blue)
-![MySQL](https://img.shields.io/badge/MySQL-8-lightblue)
-![Maven](https://img.shields.io/badge/Maven-Build-red)
-
-Sistema de seguimiento de entrenamientos construido con arquitectura de microservicios (Spring Boot, MySQL, Docker Compose). Gestiona usuarios, entrenamientos y récords personales.
-
-## Objetivo del proyecto
-
-Este proyecto ha sido desarrollado como proyecto personal para practicar una arquitectura basada en principios utilizados en entornos reales con Spring Boot. El objetivo no es construir una aplicación completa de cara a producción, sino aplicar conceptos que se usan en proyectos reales: separación de dominios, bases de datos independientes por servicio, y comunicación HTTP entre servicios.
-
-## Estructura del proyecto:
-'''
-training-microservices/
-├── usuarios-service/
-├── entrenamientos-service/
-├── docker-compose.yml
-└── README.md
-'''
-
 ## Arquitectura
 
 El sistema está compuesto por dos microservicios independientes, cada uno con su propia base de datos MySQL, que se comunican entre sí mediante HTTP (RestClient):
@@ -69,6 +46,8 @@ El razonamiento completo detrás de cada decisión (contexto, alternativas consi
 - Docker / Docker Compose
 - Maven
 - Lombok
+- Testcontainers (tests de integración con base de datos real)
+- OkHttp MockWebServer (simulación de usuarios-service en tests)
 
 ## Servicios
 
@@ -151,7 +130,14 @@ entrenamientos_db
 
 ## Testing
 
-Actualmente dispone de pruebas funcionales manuales mediante Postman. Los tests automatizados forman parte del roadmap: creación de usuarios y perfiles, creación de ejercicios y entrenamientos, comunicación HTTP real entre microservicios (validación de usuario existente), y lógica de negocio de récords personales (rechazo de un peso que no supera el récord actual).
+Ambos servicios cuentan con tests de integración automatizados usando Testcontainers, que levantan un contenedor MySQL real (no una base de datos en memoria) para cada ejecución:
+
+- usuarios-service: creación de usuario, validación de email duplicado, consulta de usuario inexistente (404).
+- entrenamientos-service: creación de un registro de entrenamiento con validación cruzada real contra un usuarios-service simulado (MockWebServer), cubriendo los tres escenarios: usuario existente (201), usuario inexistente (404), y usuarios-service no disponible (503).
+
+El último escenario prueba de forma automatizada el comportamiento de resiliencia descrito en el [ADR 0003](docs/decisions/0003-manejo-de-fallos-usuarios-service.md).
+
+Además, se ha probado manualmente de extremo a extremo con Postman: creación de ejercicios y entrenamientos, y lógica de negocio de récords personales (rechazo de un peso que no supera el récord actual).
 
 ## Lo aprendido
 
@@ -165,18 +151,20 @@ Durante este proyecto he practicado:
 - Manejo de errores centralizado en una API REST
 - Uso de DTOs para desacoplar la API del modelo de datos interno
 - Orquestación de contenedores con Docker Compose
+- Tests de integración con Testcontainers y simulación de servicios externos con MockWebServer
 
 ## Roadmap (lo no marcado son posibles implementaciones futuras)
 
 - [x] Comunicación HTTP entre microservicios
 - [x] Docker Compose con bases de datos independientes
 - [x] Manejo de errores centralizado
+- [x] Tests de integración con Testcontainers
 - [ ] Documentación OpenAPI / Swagger
-- [ ] Tests de integración con Testcontainers
 - [ ] Spring Cloud Gateway
 - [ ] Autenticación JWT
 - [ ] Service discovery con Eureka
 - [ ] Comunicación asíncrona con eventos (Kafka o RabbitMQ)
+- [ ] Orquestación con Kubernetes
 
 ## Autor
 

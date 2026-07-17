@@ -22,3 +22,6 @@ Thumbs.db
 
 # Capturas de pantalla para LinkedIn, no forman parte del proyecto
 Capturas proyecto/
+
+# Historial local de VS Code (extension Local History)
+.history/
