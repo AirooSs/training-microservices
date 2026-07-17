@@ -34,6 +34,7 @@ El razonamiento completo detrás de cada decisión (contexto, alternativas consi
 - [0002. Una base de datos independiente por microservicio](docs/decisions/0002-base-de-datos-por-servicio.md)
 - [0003. Qué ocurre si usuarios-service deja de estar disponible](docs/decisions/0003-manejo-de-fallos-usuarios-service.md)
 - [0004. Cómo evolucionaría la arquitectura si el sistema creciera](docs/decisions/0004-evolucion-futura-de-la-arquitectura.md)
+- [0005. Estrategia de testing: Testcontainers y aislamiento de contexto](docs/decisions/0005-estrategia-de-testing.md)
 
 ## Stack tecnológico
 
