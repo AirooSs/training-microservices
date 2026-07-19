@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-usuarios-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql-usuarios
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql-usuarios
+  template:
+    metadata:
+      labels:
+        app: mysql-usuarios
+    spec:
+      containers:
+        - name: mysql-usuarios
+          image: mysql:8
+          ports:
+            - containerPort: 3306
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-credentials
+                  key: MYSQL_ROOT_PASSWORD
+            - name: MYSQL_DATABASE
+              value: usuarios_db
+          volumeMounts:
+            - name: mysql-usuarios-storage
+              mountPath: /var/lib/mysql
+      volumes:
+        - name: mysql-usuarios-storage
+          persistentVolumeClaim:
+            claimName: mysql-usuarios-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-usuarios
+spec:
+  selector:
+    app: mysql-usuarios
+  ports:
+    - port: 3306
+      targetPort: 3306

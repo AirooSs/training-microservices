@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: usuarios-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: usuarios-service
+  template:
+    metadata:
+      labels:
+        app: usuarios-service
+    spec:
+      containers:
+        - name: usuarios-service
+          image: usuarios-service:1.0
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8081
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:mysql://mysql-usuarios:3306/usuarios_db"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: "root"
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-credentials
+                  key: MYSQL_ROOT_PASSWORD
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: usuarios-service
+spec:
+  selector:
+    app: usuarios-service
+  ports:
+    - port: 8081
+      targetPort: 8081

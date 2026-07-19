@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: entrenamientos-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: entrenamientos-service
+  template:
+    metadata:
+      labels:
+        app: entrenamientos-service
+    spec:
+      containers:
+        - name: entrenamientos-service
+          image: entrenamientos-service:1.0
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8082
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:mysql://mysql-entrenamientos:3306/entrenamientos_db"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: "root"
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-credentials
+                  key: MYSQL_ROOT_PASSWORD
+            - name: USUARIOS_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: entrenamientos-config
+                  key: USUARIOS_SERVICE_URL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: entrenamientos-service
+spec:
+  selector:
+    app: entrenamientos-service
+  ports:
+    - port: 8082
+      targetPort: 8082

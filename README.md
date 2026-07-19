@@ -19,6 +19,8 @@ flowchart TB
 
 `entrenamientos-service` valida contra `usuarios-service` que un usuario existe antes de crear un registro de entrenamiento o un récord personal (PR). Cada base de datos es completamente independiente: no hay claves foráneas entre servicios, solo referencias por id validadas vía HTTP.
 
+El sistema puede desplegarse de dos formas: con Docker Compose (más simple, pensado para desarrollo rápido) o con Kubernetes (más cercano a un entorno real, con recuperación automática de Pods y service discovery nativo).
+
 ## Decisiones de diseño
 
 - Una base de datos MySQL independiente por microservicio, sin acceso cruzado.
@@ -27,6 +29,7 @@ flowchart TB
 - Los campos usuarioId en Registro y PR son referencias sueltas (Long), no claves foráneas.
 - DTOs específicos por endpoint en lugar de exponer las entidades JPA directamente en la API.
 - Manejo de errores centralizado, distinguiendo entre "recurso no encontrado" (404) y "servicio externo no disponible" (503).
+- Orquestación con Kubernetes como alternativa a Docker Compose, resolviendo de forma nativa el service discovery entre microservicios.
 
 El razonamiento completo detrás de cada decisión (contexto, alternativas consideradas y consecuencias) está documentado como Architecture Decision Records en [docs/decisions/](docs/decisions/):
 
@@ -35,6 +38,7 @@ El razonamiento completo detrás de cada decisión (contexto, alternativas consi
 - [0003. Qué ocurre si usuarios-service deja de estar disponible](docs/decisions/0003-manejo-de-fallos-usuarios-service.md)
 - [0004. Cómo evolucionaría la arquitectura si el sistema creciera](docs/decisions/0004-evolucion-futura-de-la-arquitectura.md)
 - [0005. Estrategia de testing: Testcontainers y aislamiento de contexto](docs/decisions/0005-estrategia-de-testing.md)
+- [0006. Orquestación con Kubernetes](docs/decisions/0006-orquestacion-con-kubernetes.md)
 
 ## Stack tecnológico
 
@@ -45,6 +49,7 @@ El razonamiento completo detrás de cada decisión (contexto, alternativas consi
 - RestClient (comunicación entre microservicios)
 - MySQL 8
 - Docker / Docker Compose
+- Kubernetes (Minikube)
 - Maven
 - Lombok
 - Testcontainers (tests de integración con base de datos real)
@@ -91,6 +96,8 @@ Nota: Se expone un endpoint específico para comprobar la existencia de un usuar
 
 ## Cómo levantarlo en local
 
+### Opción A: Docker Compose (más simple, recomendado para desarrollo)
+
 Requisitos: Docker Desktop, Java 21, Maven (o el wrapper incluido mvnw)
 
 1. Clona el repositorio:
@@ -113,6 +120,41 @@ cd entrenamientos-service
 ./mvnw spring-boot:run
 
 5. Ambos servicios generan sus tablas automáticamente mediante spring.jpa.hibernate.ddl-auto=update, una configuración adecuada para desarrollo. En entornos de producción sería recomendable utilizar herramientas de migración como Flyway o Liquibase.
+
+### Opción B: Kubernetes (con Minikube)
+
+Requisitos adicionales: kubectl, Minikube
+
+1. Arranca el clúster local:
+
+minikube start --driver=docker
+
+2. Apunta tu terminal al Docker interno de Minikube (necesario para que el clúster vea las imágenes que construyas):
+
+minikube docker-env | Invoke-Expression
+
+3. Construye las imágenes de ambos servicios:
+
+cd usuarios-service
+docker build -t usuarios-service:1.0 .
+cd ../entrenamientos-service
+docker build -t entrenamientos-service:1.0 .
+cd ..
+
+4. Aplica todos los manifiestos:
+
+kubectl apply -f k8s/
+
+5. Comprueba que los 4 Pods están en estado Running:
+
+kubectl get pods
+
+6. Expón los servicios para probarlos desde fuera del clúster (en dos terminales distintas):
+
+kubectl port-forward service/usuarios-service 8081:8081
+kubectl port-forward service/entrenamientos-service 8082:8082
+
+El razonamiento completo de esta implementación (equivalencias con Docker Compose, cómo se resuelve el service discovery, y las limitaciones conocidas de este despliegue) está documentado en el [ADR 0006](docs/decisions/0006-orquestacion-con-kubernetes.md).
 
 ## Modelo de datos
 
@@ -138,7 +180,7 @@ Ambos servicios cuentan con tests de integración automatizados usando Testconta
 
 El último escenario prueba de forma automatizada el comportamiento de resiliencia descrito en el [ADR 0003](docs/decisions/0003-manejo-de-fallos-usuarios-service.md).
 
-Además, se ha probado manualmente de extremo a extremo con Postman: creación de ejercicios y entrenamientos, y lógica de negocio de récords personales (rechazo de un peso que no supera el récord actual).
+Además, se ha probado manualmente de extremo a extremo con Postman en ambos entornos de despliegue (Docker Compose y Kubernetes): creación de ejercicios y entrenamientos, comunicación real entre Pods a través del Service de Kubernetes, y lógica de negocio de récords personales (rechazo de un peso que no supera el récord actual).
 
 ## Lo aprendido
 
@@ -153,6 +195,9 @@ Durante este proyecto he practicado:
 - Uso de DTOs para desacoplar la API del modelo de datos interno
 - Orquestación de contenedores con Docker Compose
 - Tests de integración con Testcontainers y simulación de servicios externos con MockWebServer
+- Orquestación con Kubernetes: Deployments, Services, PersistentVolumeClaims, Secrets y ConfigMaps
+- Construcción de imágenes Docker multi-stage para aplicaciones Spring Boot
+- Configuración externalizada de Spring Boot mediante variables de entorno según el entorno de despliegue
 
 ## Roadmap (lo no marcado son posibles implementaciones futuras)
 
@@ -160,12 +205,12 @@ Durante este proyecto he practicado:
 - [x] Docker Compose con bases de datos independientes
 - [x] Manejo de errores centralizado
 - [x] Tests de integración con Testcontainers
+- [x] Orquestación con Kubernetes
 - [ ] Documentación OpenAPI / Swagger
 - [ ] Spring Cloud Gateway
 - [ ] Autenticación JWT
-- [ ] Service discovery con Eureka
 - [ ] Comunicación asíncrona con eventos (Kafka o RabbitMQ)
-- [ ] Orquestación con Kubernetes
+- [ ] Gestión de secretos con una herramienta dedicada (Sealed Secrets o similar)
 
 ## Autor
 

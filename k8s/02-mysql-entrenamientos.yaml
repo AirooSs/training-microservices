@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-entrenamientos-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql-entrenamientos
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql-entrenamientos
+  template:
+    metadata:
+      labels:
+        app: mysql-entrenamientos
+    spec:
+      containers:
+        - name: mysql-entrenamientos
+          image: mysql:8
+          ports:
+            - containerPort: 3306
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-credentials
+                  key: MYSQL_ROOT_PASSWORD
+            - name: MYSQL_DATABASE
+              value: entrenamientos_db
+          volumeMounts:
+            - name: mysql-entrenamientos-storage
+              mountPath: /var/lib/mysql
+      volumes:
+        - name: mysql-entrenamientos-storage
+          persistentVolumeClaim:
+            claimName: mysql-entrenamientos-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-entrenamientos
+spec:
+  selector:
+    app: mysql-entrenamientos
+  ports:
+    - port: 3306
+      targetPort: 3306
