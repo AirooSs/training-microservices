@@ -1,3 +1,30 @@
+# Training Microservices
+
+![Java](https://img.shields.io/badge/Java-21-orange)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.16-brightgreen)
+![Docker](https://img.shields.io/badge/Docker-Compose-blue)
+![Kubernetes](https://img.shields.io/badge/Kubernetes-Minikube-326ce5)
+![MySQL](https://img.shields.io/badge/MySQL-8-lightblue)
+![Maven](https://img.shields.io/badge/Maven-Build-red)
+
+Sistema de seguimiento de entrenamientos construido con arquitectura de microservicios (Spring Boot, MySQL, Docker Compose, Kubernetes). Gestiona usuarios, entrenamientos y récords personales.
+
+## Objetivo del proyecto
+
+Este proyecto ha sido desarrollado como proyecto personal para practicar una arquitectura basada en principios utilizados en entornos reales con Spring Boot. El objetivo no es construir una aplicación completa de cara a producción, sino aplicar conceptos que se usan en proyectos reales: separación de dominios, bases de datos independientes por servicio, comunicación HTTP entre servicios, y su orquestación.
+
+## Estructura del proyecto:
+```
+training-microservices/
+├── usuarios-service/
+├── entrenamientos-service/
+├── k8s/
+├── docs/
+│   └── decisions/
+├── docker-compose.yml
+└── README.md
+```
+
 ## Arquitectura
 
 El sistema está compuesto por dos microservicios independientes, cada uno con su propia base de datos MySQL, que se comunican entre sí mediante HTTP (RestClient):
@@ -30,6 +57,7 @@ El sistema puede desplegarse de dos formas: con Docker Compose (más simple, pen
 - DTOs específicos por endpoint en lugar de exponer las entidades JPA directamente en la API.
 - Manejo de errores centralizado, distinguiendo entre "recurso no encontrado" (404) y "servicio externo no disponible" (503).
 - Orquestación con Kubernetes como alternativa a Docker Compose, resolviendo de forma nativa el service discovery entre microservicios.
+- Documentación de API generada automáticamente con OpenAPI/Swagger a partir del propio código.
 
 El razonamiento completo detrás de cada decisión (contexto, alternativas consideradas y consecuencias) está documentado como Architecture Decision Records en [docs/decisions/](docs/decisions/):
 
@@ -54,12 +82,15 @@ El razonamiento completo detrás de cada decisión (contexto, alternativas consi
 - Lombok
 - Testcontainers (tests de integración con base de datos real)
 - OkHttp MockWebServer (simulación de usuarios-service en tests)
+- springdoc-openapi (documentación interactiva con Swagger UI)
 
 ## Servicios
 
 ### usuarios-service (puerto 8081)
 
 Gestiona los usuarios y su perfil físico (peso, altura, histórico).
+
+Documentación interactiva: `http://localhost:8081/swagger-ui.html`
 
 | Método | Endpoint | Descripción |
 |---|---|---|
@@ -75,6 +106,8 @@ Gestiona los usuarios y su perfil físico (peso, altura, histórico).
 ### entrenamientos-service (puerto 8082)
 
 Gestiona ejercicios, entrenamientos, registros de entrenamiento y récords personales (PR).
+
+Documentación interactiva: `http://localhost:8082/swagger-ui.html`
 
 | Método | Endpoint | Descripción |
 |---|---|---|
@@ -120,6 +153,8 @@ cd entrenamientos-service
 ./mvnw spring-boot:run
 
 5. Ambos servicios generan sus tablas automáticamente mediante spring.jpa.hibernate.ddl-auto=update, una configuración adecuada para desarrollo. En entornos de producción sería recomendable utilizar herramientas de migración como Flyway o Liquibase.
+
+6. Una vez arrancados, la documentación interactiva de cada API está disponible en /swagger-ui.html de cada servicio (ver enlaces en la sección Servicios).
 
 ### Opción B: Kubernetes (con Minikube)
 
@@ -198,6 +233,7 @@ Durante este proyecto he practicado:
 - Orquestación con Kubernetes: Deployments, Services, PersistentVolumeClaims, Secrets y ConfigMaps
 - Construcción de imágenes Docker multi-stage para aplicaciones Spring Boot
 - Configuración externalizada de Spring Boot mediante variables de entorno según el entorno de despliegue
+- Documentación de API con OpenAPI/Swagger, incluyendo códigos de respuesta y casos de error
 
 ## Roadmap (lo no marcado son posibles implementaciones futuras)
 
@@ -206,7 +242,7 @@ Durante este proyecto he practicado:
 - [x] Manejo de errores centralizado
 - [x] Tests de integración con Testcontainers
 - [x] Orquestación con Kubernetes
-- [ ] Documentación OpenAPI / Swagger
+- [x] Documentación OpenAPI / Swagger
 - [ ] Spring Cloud Gateway
 - [ ] Autenticación JWT
 - [ ] Comunicación asíncrona con eventos (Kafka o RabbitMQ)
