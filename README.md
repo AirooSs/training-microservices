@@ -14,37 +14,42 @@ Sistema de seguimiento de entrenamientos construido con arquitectura de microser
 Este proyecto ha sido desarrollado como proyecto personal para practicar una arquitectura basada en principios utilizados en entornos reales con Spring Boot. El objetivo no es construir una aplicación completa de cara a producción, sino aplicar conceptos que se usan en proyectos reales: separación de dominios, bases de datos independientes por servicio, comunicación HTTP entre servicios, y su orquestación.
 
 ## Estructura del proyecto:
-```
+
 training-microservices/
 ├── usuarios-service/
 ├── entrenamientos-service/
+├── gateway-service/
 ├── k8s/
 ├── docs/
-│   └── decisions/
+│ └── decisions/
 ├── docker-compose.yml
 └── README.md
-```
+
 
 ## Arquitectura
 
-El sistema está compuesto por dos microservicios independientes, cada uno con su propia base de datos MySQL, que se comunican entre sí mediante HTTP (RestClient):
+El sistema está compuesto por dos microservicios de negocio, cada uno con su propia base de datos MySQL, y un Gateway que actúa como único punto de entrada:
 
 ```mermaid
 flowchart TB
     Cliente["Cliente (Postman)"]
+    GW["gateway-service<br/>puerto 8080"]
     US["usuarios-service<br/>puerto 8081"]
     ES["entrenamientos-service<br/>puerto 8082"]
     DBU[("MySQL usuarios_db<br/>puerto 3307")]
     DBE[("MySQL entrenamientos_db<br/>puerto 3308")]
 
-    Cliente --> US
-    Cliente --> ES
+    Cliente --> GW
+    GW --> US
+    GW --> ES
     ES -- HTTP --> US
     US --> DBU
     ES --> DBE
 ```
 
 `entrenamientos-service` valida contra `usuarios-service` que un usuario existe antes de crear un registro de entrenamiento o un récord personal (PR). Cada base de datos es completamente independiente: no hay claves foráneas entre servicios, solo referencias por id validadas vía HTTP.
+
+`gateway-service` no tiene lógica de negocio ni base de datos propia: enruta las peticiones externas hacia el microservicio correspondiente según la ruta solicitada, de forma que el cliente solo necesita conocer un único puerto (8080).
 
 El sistema puede desplegarse de dos formas: con Docker Compose (más simple, pensado para desarrollo rápido) o con Kubernetes (más cercano a un entorno real, con recuperación automática de Pods y service discovery nativo).
 
@@ -58,6 +63,7 @@ El sistema puede desplegarse de dos formas: con Docker Compose (más simple, pen
 - Manejo de errores centralizado, distinguiendo entre "recurso no encontrado" (404) y "servicio externo no disponible" (503).
 - Orquestación con Kubernetes como alternativa a Docker Compose, resolviendo de forma nativa el service discovery entre microservicios.
 - Documentación de API generada automáticamente con OpenAPI/Swagger a partir del propio código.
+- API Gateway como punto de entrada único, desacoplando al cliente de la topología interna de microservicios.
 
 El razonamiento completo detrás de cada decisión (contexto, alternativas consideradas y consecuencias) está documentado como Architecture Decision Records en [docs/decisions/](docs/decisions/):
 
@@ -67,11 +73,14 @@ El razonamiento completo detrás de cada decisión (contexto, alternativas consi
 - [0004. Cómo evolucionaría la arquitectura si el sistema creciera](docs/decisions/0004-evolucion-futura-de-la-arquitectura.md)
 - [0005. Estrategia de testing: Testcontainers y aislamiento de contexto](docs/decisions/0005-estrategia-de-testing.md)
 - [0006. Orquestación con Kubernetes](docs/decisions/0006-orquestacion-con-kubernetes.md)
+- [0007. API Gateway como punto de entrada único](docs/decisions/0007-api-gateway.md)
 
 ## Stack tecnológico
 
 - Java 21
-- Spring Boot 3.5.16
+- Spring Boot 3.5.16 (usuarios-service, entrenamientos-service)
+- Spring Boot 4.1.1 (gateway-service)
+- Spring Cloud Gateway
 - Spring Data JPA / Hibernate
 - Spring Validation
 - RestClient (comunicación entre microservicios)
@@ -85,6 +94,15 @@ El razonamiento completo detrás de cada decisión (contexto, alternativas consi
 - springdoc-openapi (documentación interactiva con Swagger UI)
 
 ## Servicios
+
+### gateway-service (puerto 8080)
+
+Punto de entrada único del sistema. Sin lógica de negocio ni base de datos propia, enruta las peticiones al microservicio correspondiente:
+
+| Ruta | Redirige a |
+|---|---|
+| /usuarios/**, /perfiles/** | usuarios-service |
+| /ejercicios/**, /entrenamientos/**, /entrenamiento-ejercicios/**, /registros/**, /prs/** | entrenamientos-service |
 
 ### usuarios-service (puerto 8081)
 
@@ -152,9 +170,16 @@ cd usuarios-service
 cd entrenamientos-service
 ./mvnw spring-boot:run
 
-5. Ambos servicios generan sus tablas automáticamente mediante spring.jpa.hibernate.ddl-auto=update, una configuración adecuada para desarrollo. En entornos de producción sería recomendable utilizar herramientas de migración como Flyway o Liquibase.
+5. En una tercera terminal, arranca gateway-service (puerto 8080):
 
-6. Una vez arrancados, la documentación interactiva de cada API está disponible en /swagger-ui.html de cada servicio (ver enlaces en la sección Servicios).
+cd gateway-service
+./mvnw spring-boot:run
+
+6. Ambos servicios de negocio generan sus tablas automáticamente mediante spring.jpa.hibernate.ddl-auto=update, una configuración adecuada para desarrollo. En entornos de producción sería recomendable utilizar herramientas de migración como Flyway o Liquibase.
+
+7. Con los tres servicios arrancados, todas las peticiones pueden hacerse a través del Gateway en el puerto 8080 (por ejemplo, `http://localhost:8080/usuarios`), en lugar de contactar directamente con cada microservicio.
+
+8. La documentación interactiva de cada API sigue disponible en /swagger-ui.html de usuarios-service y entrenamientos-service (ver enlaces en la sección Servicios).
 
 ### Opción B: Kubernetes (con Minikube)
 
@@ -191,6 +216,8 @@ kubectl port-forward service/entrenamientos-service 8082:8082
 
 El razonamiento completo de esta implementación (equivalencias con Docker Compose, cómo se resuelve el service discovery, y las limitaciones conocidas de este despliegue) está documentado en el [ADR 0006](docs/decisions/0006-orquestacion-con-kubernetes.md).
 
+Nota: el despliegue de gateway-service en Kubernetes está pendiente (ver Roadmap); por ahora, en Kubernetes cada microservicio se expone por separado con su propio port-forward.
+
 ## Modelo de datos
 
 El modelo se divide en dos bases de datos independientes:
@@ -208,14 +235,14 @@ entrenamientos_db
 
 ## Testing
 
-Ambos servicios cuentan con tests de integración automatizados usando Testcontainers, que levantan un contenedor MySQL real (no una base de datos en memoria) para cada ejecución:
+Ambos servicios de negocio cuentan con tests de integración automatizados usando Testcontainers, que levantan un contenedor MySQL real (no una base de datos en memoria) para cada ejecución:
 
 - usuarios-service: creación de usuario, validación de email duplicado, consulta de usuario inexistente (404).
 - entrenamientos-service: creación de un registro de entrenamiento con validación cruzada real contra un usuarios-service simulado (MockWebServer), cubriendo los tres escenarios: usuario existente (201), usuario inexistente (404), y usuarios-service no disponible (503).
 
 El último escenario prueba de forma automatizada el comportamiento de resiliencia descrito en el [ADR 0003](docs/decisions/0003-manejo-de-fallos-usuarios-service.md).
 
-Además, se ha probado manualmente de extremo a extremo con Postman en ambos entornos de despliegue (Docker Compose y Kubernetes): creación de ejercicios y entrenamientos, comunicación real entre Pods a través del Service de Kubernetes, y lógica de negocio de récords personales (rechazo de un peso que no supera el récord actual).
+Además, se ha probado manualmente de extremo a extremo con Postman en ambos entornos de despliegue (Docker Compose y Kubernetes): creación de ejercicios y entrenamientos, comunicación real entre Pods a través del Service de Kubernetes, enrutado correcto a través del Gateway hacia ambos microservicios, y lógica de negocio de récords personales (rechazo de un peso que no supera el récord actual).
 
 ## Lo aprendido
 
@@ -234,6 +261,7 @@ Durante este proyecto he practicado:
 - Construcción de imágenes Docker multi-stage para aplicaciones Spring Boot
 - Configuración externalizada de Spring Boot mediante variables de entorno según el entorno de despliegue
 - Documentación de API con OpenAPI/Swagger, incluyendo códigos de respuesta y casos de error
+- Configuración de un API Gateway con Spring Cloud Gateway, incluyendo depuración de cambios de configuración entre versiones recientes de la librería
 
 ## Roadmap (lo no marcado son posibles implementaciones futuras)
 
@@ -243,7 +271,8 @@ Durante este proyecto he practicado:
 - [x] Tests de integración con Testcontainers
 - [x] Orquestación con Kubernetes
 - [x] Documentación OpenAPI / Swagger
-- [ ] Spring Cloud Gateway
+- [x] Spring Cloud Gateway
+- [ ] Despliegue de gateway-service en Kubernetes
 - [ ] Autenticación JWT
 - [ ] Comunicación asíncrona con eventos (Kafka o RabbitMQ)
 - [ ] Gestión de secretos con una herramienta dedicada (Sealed Secrets o similar)
