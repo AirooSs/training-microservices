@@ -193,30 +193,30 @@ minikube start --driver=docker
 
 minikube docker-env | Invoke-Expression
 
-3. Construye las imágenes de ambos servicios:
+3. Construye las imágenes de los tres servicios:
 
 cd usuarios-service
 docker build -t usuarios-service:1.0 .
 cd ../entrenamientos-service
 docker build -t entrenamientos-service:1.0 .
+cd ../gateway-service
+docker build -t gateway-service:1.0 .
 cd ..
 
 4. Aplica todos los manifiestos:
 
 kubectl apply -f k8s/
 
-5. Comprueba que los 4 Pods están en estado Running:
+5. Comprueba que los 5 Pods están en estado Running:
 
 kubectl get pods
 
-6. Expón los servicios para probarlos desde fuera del clúster (en dos terminales distintas):
+6. Expón el Gateway para probarlo desde fuera del clúster; todas las peticiones pasan por este único punto de entrada:
 
-kubectl port-forward service/usuarios-service 8081:8081
-kubectl port-forward service/entrenamientos-service 8082:8082
+kubectl port-forward service/gateway-service 8080:8080
 
-El razonamiento completo de esta implementación (equivalencias con Docker Compose, cómo se resuelve el service discovery, y las limitaciones conocidas de este despliegue) está documentado en el [ADR 0006](docs/decisions/0006-orquestacion-con-kubernetes.md).
-
-Nota: el despliegue de gateway-service en Kubernetes está pendiente (ver Roadmap); por ahora, en Kubernetes cada microservicio se expone por separado con su propio port-forward.
+El razonamiento completo de esta implementación (equivalencias con Docker Compose, cómo se resuelve el service discovery, y las limitaciones conocidas de este despliegue) está documentado en el [ADR 0006](docs/decisions/0006-orquestacion-con-kubernetes.md). 
+El despliegue del Gateway se documenta en el [ADR 0007](docs/decisions/0007-api-gateway.md).
 
 ## Modelo de datos
 
@@ -272,7 +272,7 @@ Durante este proyecto he practicado:
 - [x] Orquestación con Kubernetes
 - [x] Documentación OpenAPI / Swagger
 - [x] Spring Cloud Gateway
-- [ ] Despliegue de gateway-service en Kubernetes
+- [x] Despliegue de gateway-service en Kubernetes
 - [ ] Autenticación JWT
 - [ ] Comunicación asíncrona con eventos (Kafka o RabbitMQ)
 - [ ] Gestión de secretos con una herramienta dedicada (Sealed Secrets o similar)
