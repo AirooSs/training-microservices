@@ -29,6 +29,9 @@ public class Usuario {
 	@Email(message = "El email no tiene un formato valido")
 	@Column(unique = true)
 	private String email;
+	
+	@NotBlank(message = "La contrasena es obligatoria")
+	private String password;
 
 	@NotNull(message = "La fecha de nacimiento es obligatoria")
 	private LocalDate fechaNacimiento;

@@ -3,6 +3,7 @@ package com.fran.usuarios_service.service;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.fran.usuarios_service.model.Usuario;
@@ -12,19 +13,32 @@ import com.fran.usuarios_service.repository.UsuarioRepository;
 public class UsuarioService {
 
 	private final UsuarioRepository usuarioRepository;
+	private final PasswordEncoder passwordEncoder;
+	private final JwtService jwtService;
 
 	@Autowired
-
-	public UsuarioService(UsuarioRepository usuarioRepository) {
+	public UsuarioService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, JwtService jwtService) {
 		this.usuarioRepository = usuarioRepository;
+		this.passwordEncoder = passwordEncoder;
+		this.jwtService = jwtService;
+	}
+
+	public String login(String email, String password) {
+		Usuario usuario = usuarioRepository.findByEmail(email)
+				.orElseThrow(() -> new IllegalArgumentException("Email o contrasena incorrectos"));
+
+		if (!passwordEncoder.matches(password, usuario.getPassword())) {
+			throw new IllegalArgumentException("Email o contrasena incorrectos");
+		}
+
+		return jwtService.generarToken(usuario.getId(), usuario.getEmail());
 	}
 
 	public Usuario crear(Usuario usuario) {
-		// Regla: No permitir dos usuarios con el mismo email
-
 		if (usuarioRepository.existsByEmail(usuario.getEmail())) {
 			throw new IllegalArgumentException("Ya existe un usuario con el mismo email");
 		}
+		usuario.setPassword(passwordEncoder.encode(usuario.getPassword()));
 		return usuarioRepository.save(usuario);
 	}
 

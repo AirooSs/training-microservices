@@ -12,9 +12,12 @@ spring:
             - id: usuarios-service
               uri: ${USUARIOS_SERVICE_URL:http://localhost:8081}
               predicates:
-                - Path=/usuarios/**,/perfiles/**
+                - Path=/usuarios/**,/perfiles/**,/auth/**
 
             - id: entrenamientos-service
               uri: ${ENTRENAMIENTOS_SERVICE_URL:http://localhost:8082}
               predicates:
-                - Path=/ejercicios/**,/entrenamientos/**,/entrenamiento-ejercicios/**,/registros/**,/prs/**os/**,/prs/**
+                - Path=/ejercicios/**,/entrenamientos/**,/entrenamiento-ejercicios/**,/registros/**,/prs/**
+
+jwt:
+  secret: cambia-esta-clave-por-una-mas-larga-y-aleatoria-en-produccion-1234567890

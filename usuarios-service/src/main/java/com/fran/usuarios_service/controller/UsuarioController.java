@@ -1,5 +1,6 @@
 package com.fran.usuarios_service.controller;
 
+import com.fran.usuarios_service.dto.UsuarioResponse;
 import com.fran.usuarios_service.model.Usuario;
 import com.fran.usuarios_service.service.UsuarioService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -33,9 +34,9 @@ public class UsuarioController {
             @ApiResponse(responseCode = "400", description = "Datos invalidos o email ya existente")
     })
     @PostMapping
-    public ResponseEntity<Usuario> crear(@Valid @RequestBody Usuario usuario) {
+    public ResponseEntity<UsuarioResponse> crear(@Valid @RequestBody Usuario usuario) {
         Usuario creado = usuarioService.crear(usuario);
-        return ResponseEntity.status(HttpStatus.CREATED).body(creado);
+        return ResponseEntity.status(HttpStatus.CREATED).body(UsuarioResponse.desde(creado));
     }
 
     @Operation(summary = "Consultar un usuario por id")
@@ -44,18 +45,21 @@ public class UsuarioController {
             @ApiResponse(responseCode = "404", description = "Usuario no encontrado")
     })
     @GetMapping("/{id}")
-    public ResponseEntity<Usuario> buscarPorId(@PathVariable Long id) {
-        return ResponseEntity.ok(usuarioService.buscarPorId(id));
+    public ResponseEntity<UsuarioResponse> buscarPorId(@PathVariable Long id) {
+        return ResponseEntity.ok(UsuarioResponse.desde(usuarioService.buscarPorId(id)));
     }
 
     @GetMapping
-    public ResponseEntity<List<Usuario>> listarTodos() {
-        return ResponseEntity.ok(usuarioService.listarTodos());
+    public ResponseEntity<List<UsuarioResponse>> listarTodos() {
+        List<UsuarioResponse> respuesta = usuarioService.listarTodos().stream()
+                .map(UsuarioResponse::desde)
+                .toList();
+        return ResponseEntity.ok(respuesta);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Usuario> actualizar(@PathVariable Long id, @Valid @RequestBody Usuario usuario) {
-        return ResponseEntity.ok(usuarioService.actualizar(id, usuario));
+    public ResponseEntity<UsuarioResponse> actualizar(@PathVariable Long id, @Valid @RequestBody Usuario usuario) {
+        return ResponseEntity.ok(UsuarioResponse.desde(usuarioService.actualizar(id, usuario)));
     }
 
     @DeleteMapping("/{id}")
