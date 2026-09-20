@@ -11,30 +11,30 @@ Sistema de seguimiento de entrenamientos construido con arquitectura de microser
 
 ## Objetivo del proyecto
 
-Este proyecto ha sido desarrollado como proyecto personal para practicar una arquitectura basada en principios utilizados en entornos reales con Spring Boot. El objetivo no es construir una aplicación completa de cara a producción, sino aplicar conceptos que se usan en proyectos reales: separación de dominios, bases de datos independientes por servicio, comunicación HTTP entre servicios, y su orquestación.
+Este proyecto ha sido desarrollado como proyecto personal para practicar una arquitectura basada en principios utilizados en entornos reales con Spring Boot. El objetivo no es construir una aplicación completa de cara a producción, sino aplicar conceptos que se usan en proyectos reales: separación de dominios, bases de datos independientes por servicio, comunicación HTTP entre servicios, su orquestación y su seguridad.
 
 ## Estructura del proyecto:
-
+```
 training-microservices/
 ├── usuarios-service/
 ├── entrenamientos-service/
 ├── gateway-service/
 ├── k8s/
 ├── docs/
-│ └── decisions/
+│   └── decisions/
 ├── docker-compose.yml
 └── README.md
-
+```
 
 ## Arquitectura
 
-El sistema está compuesto por dos microservicios de negocio, cada uno con su propia base de datos MySQL, y un Gateway que actúa como único punto de entrada:
+El sistema está compuesto por dos microservicios de negocio, cada uno con su propia base de datos MySQL, y un Gateway que actúa como único punto de entrada y valida la autenticación:
 
 ```mermaid
 flowchart TB
     Cliente["Cliente (Postman)"]
-    GW["gateway-service<br/>puerto 8080"]
-    US["usuarios-service<br/>puerto 8081"]
+    GW["gateway-service<br/>puerto 8080<br/>valida JWT"]
+    US["usuarios-service<br/>puerto 8081<br/>login y registro"]
     ES["entrenamientos-service<br/>puerto 8082"]
     DBU[("MySQL usuarios_db<br/>puerto 3307")]
     DBE[("MySQL entrenamientos_db<br/>puerto 3308")]
@@ -49,7 +49,7 @@ flowchart TB
 
 `entrenamientos-service` valida contra `usuarios-service` que un usuario existe antes de crear un registro de entrenamiento o un récord personal (PR). Cada base de datos es completamente independiente: no hay claves foráneas entre servicios, solo referencias por id validadas vía HTTP.
 
-`gateway-service` no tiene lógica de negocio ni base de datos propia: enruta las peticiones externas hacia el microservicio correspondiente según la ruta solicitada, de forma que el cliente solo necesita conocer un único puerto (8080).
+`gateway-service` no tiene lógica de negocio ni base de datos propia: enruta las peticiones externas hacia el microservicio correspondiente según la ruta solicitada, y valida el token JWT de cada petición antes de dejarla pasar, de forma que el cliente solo necesita conocer un único puerto (8080) y autenticarse una sola vez.
 
 El sistema puede desplegarse de dos formas: con Docker Compose (más simple, pensado para desarrollo rápido) o con Kubernetes (más cercano a un entorno real, con recuperación automática de Pods y service discovery nativo).
 
@@ -64,6 +64,7 @@ El sistema puede desplegarse de dos formas: con Docker Compose (más simple, pen
 - Orquestación con Kubernetes como alternativa a Docker Compose, resolviendo de forma nativa el service discovery entre microservicios.
 - Documentación de API generada automáticamente con OpenAPI/Swagger a partir del propio código.
 - API Gateway como punto de entrada único, desacoplando al cliente de la topología interna de microservicios.
+- Autenticación JWT validada de forma centralizada en el Gateway, en lugar de duplicar la lógica de seguridad en cada microservicio.
 
 El razonamiento completo detrás de cada decisión (contexto, alternativas consideradas y consecuencias) está documentado como Architecture Decision Records en [docs/decisions/](docs/decisions/):
 
@@ -74,6 +75,7 @@ El razonamiento completo detrás de cada decisión (contexto, alternativas consi
 - [0005. Estrategia de testing: Testcontainers y aislamiento de contexto](docs/decisions/0005-estrategia-de-testing.md)
 - [0006. Orquestación con Kubernetes](docs/decisions/0006-orquestacion-con-kubernetes.md)
 - [0007. API Gateway como punto de entrada único](docs/decisions/0007-api-gateway.md)
+- [0008. Autenticación JWT centralizada en el Gateway](docs/decisions/0008-autenticacion-jwt.md)
 
 ## Stack tecnológico
 
@@ -81,6 +83,8 @@ El razonamiento completo detrás de cada decisión (contexto, alternativas consi
 - Spring Boot 3.5.16 (usuarios-service, entrenamientos-service)
 - Spring Boot 4.1.1 (gateway-service)
 - Spring Cloud Gateway
+- Spring Security (usuarios-service)
+- JJWT (generación y validación de tokens JWT)
 - Spring Data JPA / Hibernate
 - Spring Validation
 - RestClient (comunicación entre microservicios)
@@ -97,22 +101,25 @@ El razonamiento completo detrás de cada decisión (contexto, alternativas consi
 
 ### gateway-service (puerto 8080)
 
-Punto de entrada único del sistema. Sin lógica de negocio ni base de datos propia, enruta las peticiones al microservicio correspondiente:
+Punto de entrada único del sistema. Sin lógica de negocio ni base de datos propia, enruta las peticiones al microservicio correspondiente y valida el token JWT de cada petición (salvo en las rutas públicas):
 
-| Ruta | Redirige a |
-|---|---|
-| /usuarios/**, /perfiles/** | usuarios-service |
-| /ejercicios/**, /entrenamientos/**, /entrenamiento-ejercicios/**, /registros/**, /prs/** | entrenamientos-service |
+| Ruta | Redirige a | Requiere token |
+|---|---|---|
+| POST /auth/login | usuarios-service | No |
+| POST /usuarios (registro) | usuarios-service | No |
+| Resto de /usuarios/**, /perfiles/** | usuarios-service | Sí |
+| /ejercicios/**, /entrenamientos/**, /entrenamiento-ejercicios/**, /registros/**, /prs/** | entrenamientos-service | Sí |
 
 ### usuarios-service (puerto 8081)
 
-Gestiona los usuarios y su perfil físico (peso, altura, histórico).
+Gestiona los usuarios, su perfil físico (peso, altura, histórico), y la autenticación.
 
 Documentación interactiva: `http://localhost:8081/swagger-ui.html`
 
 | Método | Endpoint | Descripción |
 |---|---|---|
-| POST | /usuarios | Crea un usuario |
+| POST | /auth/login | Valida credenciales y devuelve un token JWT |
+| POST | /usuarios | Crea un usuario (registro), con contraseña hasheada con BCrypt |
 | GET | /usuarios/{id} | Consulta un usuario |
 | GET | /usuarios | Lista todos los usuarios |
 | PUT | /usuarios/{id} | Actualiza un usuario |
@@ -120,6 +127,8 @@ Documentación interactiva: `http://localhost:8081/swagger-ui.html`
 | GET | /usuarios/{id}/existe | Comprueba si un usuario existe (uso interno, consumido por entrenamientos-service) |
 | POST | /perfiles | Crea un registro de perfil físico |
 | GET | /perfiles/usuario/{usuarioId} | Historial de perfil físico de un usuario |
+
+Nota: las respuestas de estos endpoints nunca incluyen el campo password, ni siquiera hasheado; se exponen a través de un DTO de respuesta que lo excluye explícitamente.
 
 ### entrenamientos-service (puerto 8082)
 
@@ -177,7 +186,12 @@ cd gateway-service
 
 6. Ambos servicios de negocio generan sus tablas automáticamente mediante spring.jpa.hibernate.ddl-auto=update, una configuración adecuada para desarrollo. En entornos de producción sería recomendable utilizar herramientas de migración como Flyway o Liquibase.
 
-7. Con los tres servicios arrancados, todas las peticiones pueden hacerse a través del Gateway en el puerto 8080 (por ejemplo, `http://localhost:8080/usuarios`), en lugar de contactar directamente con cada microservicio.
+7. Todas las peticiones deben hacerse a través del Gateway en el puerto 8080. Primero regístrate y haz login para obtener un token:
+
+POST http://localhost:8080/usuarios (registro, público)
+POST http://localhost:8080/auth/login (login, público)
+
+Con el token obtenido, añádelo como cabecera Authorization: Bearer <token> en el resto de peticiones.
 
 8. La documentación interactiva de cada API sigue disponible en /swagger-ui.html de usuarios-service y entrenamientos-service (ver enlaces en la sección Servicios).
 
@@ -215,15 +229,14 @@ kubectl get pods
 
 kubectl port-forward service/gateway-service 8080:8080
 
-El razonamiento completo de esta implementación (equivalencias con Docker Compose, cómo se resuelve el service discovery, y las limitaciones conocidas de este despliegue) está documentado en el [ADR 0006](docs/decisions/0006-orquestacion-con-kubernetes.md). 
-El despliegue del Gateway se documenta en el [ADR 0007](docs/decisions/0007-api-gateway.md).
+El razonamiento completo de esta implementación (equivalencias con Docker Compose, cómo se resuelve el service discovery, y las limitaciones conocidas de este despliegue) está documentado en el [ADR 0006](docs/decisions/0006-orquestacion-con-kubernetes.md). El despliegue del Gateway se documenta en el [ADR 0007](docs/decisions/0007-api-gateway.md).
 
 ## Modelo de datos
 
 El modelo se divide en dos bases de datos independientes:
 
 usuarios_db
-- Usuario: datos básicos del usuario
+- Usuario: datos básicos del usuario, incluida la contraseña hasheada con BCrypt
 - PerfilFisico: histórico de peso y altura (relación 1:N con Usuario)
 
 entrenamientos_db
@@ -242,7 +255,7 @@ Ambos servicios de negocio cuentan con tests de integración automatizados usand
 
 El último escenario prueba de forma automatizada el comportamiento de resiliencia descrito en el [ADR 0003](docs/decisions/0003-manejo-de-fallos-usuarios-service.md).
 
-Además, se ha probado manualmente de extremo a extremo con Postman en ambos entornos de despliegue (Docker Compose y Kubernetes): creación de ejercicios y entrenamientos, comunicación real entre Pods a través del Service de Kubernetes, enrutado correcto a través del Gateway hacia ambos microservicios, y lógica de negocio de récords personales (rechazo de un peso que no supera el récord actual).
+Además, se ha probado manualmente de extremo a extremo con Postman en ambos entornos de despliegue (Docker Compose y Kubernetes): creación de ejercicios y entrenamientos, comunicación real entre Pods a través del Service de Kubernetes, enrutado correcto a través del Gateway hacia ambos microservicios, lógica de negocio de récords personales (rechazo de un peso que no supera el récord actual), y el flujo completo de autenticación (registro, login, acceso denegado sin token, acceso permitido con token válido).
 
 ## Lo aprendido
 
@@ -262,6 +275,8 @@ Durante este proyecto he practicado:
 - Configuración externalizada de Spring Boot mediante variables de entorno según el entorno de despliegue
 - Documentación de API con OpenAPI/Swagger, incluyendo códigos de respuesta y casos de error
 - Configuración de un API Gateway con Spring Cloud Gateway, incluyendo depuración de cambios de configuración entre versiones recientes de la librería
+- Autenticación con JWT: hasheo de contraseñas con BCrypt, generación y validación de tokens, y filtros globales reactivos (GlobalFilter) en Spring Cloud Gateway
+- Uso de DTOs de respuesta para evitar exponer datos sensibles (como el hash de una contraseña) en una API REST
 
 ## Roadmap (lo no marcado son posibles implementaciones futuras)
 
@@ -273,7 +288,8 @@ Durante este proyecto he practicado:
 - [x] Documentación OpenAPI / Swagger
 - [x] Spring Cloud Gateway
 - [x] Despliegue de gateway-service en Kubernetes
-- [ ] Autenticación JWT
+- [x] Autenticación JWT
+- [ ] Proteger entrenamientos-service directamente (no solo a través del Gateway), o restringir su acceso directo mediante reglas de red / NetworkPolicy en Kubernetes
 - [ ] Comunicación asíncrona con eventos (Kafka o RabbitMQ)
 - [ ] Gestión de secretos con una herramienta dedicada (Sealed Secrets o similar)
 
