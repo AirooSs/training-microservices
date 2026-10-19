@@ -76,6 +76,7 @@ El razonamiento completo detrás de cada decisión (contexto, alternativas consi
 - [0006. Orquestación con Kubernetes](docs/decisions/0006-orquestacion-con-kubernetes.md)
 - [0007. API Gateway como punto de entrada único](docs/decisions/0007-api-gateway.md)
 - [0008. Autenticación JWT centralizada en el Gateway](docs/decisions/0008-autenticacion-jwt.md)
+- [0009. Restricción de acceso a entrenamientos-service con NetworkPolicy](docs/decisions/0009-networkpolicy-entrenamientos.md)
 
 ## Stack tecnológico
 
@@ -289,7 +290,7 @@ Durante este proyecto he practicado:
 - [x] Spring Cloud Gateway
 - [x] Despliegue de gateway-service en Kubernetes
 - [x] Autenticación JWT
-- [ ] Proteger entrenamientos-service directamente (no solo a través del Gateway), o restringir su acceso directo mediante reglas de red / NetworkPolicy en Kubernetes
+- [x] NetworkPolicy creada para restringir entrenamientos-service (limitación conocida: no se hace cumplir en Minikube sin un CNI compatible, ver ADR 0009)
 - [ ] Comunicación asíncrona con eventos (Kafka o RabbitMQ)
 - [ ] Gestión de secretos con una herramienta dedicada (Sealed Secrets o similar)
 
