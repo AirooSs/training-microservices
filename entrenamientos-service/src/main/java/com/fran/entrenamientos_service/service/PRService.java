@@ -1,5 +1,6 @@
 package com.fran.entrenamientos_service.service;
 
+import com.fran.entrenamientos_service.event.PrBatidoEvent;
 import com.fran.entrenamientos_service.model.Ejercicio;
 import com.fran.entrenamientos_service.model.PR;
 import com.fran.entrenamientos_service.repository.PRRepository;
@@ -15,17 +16,17 @@ public class PRService {
     private final PRRepository repo;
     private final EjercicioService ejercicioSrv;
     private final UsuarioClient usuarioClient;
+    private final PrEventPublisher eventPublisher;
 
     @Autowired
-    public PRService(PRRepository repo, EjercicioService ejercicioSrv, UsuarioClient usuarioClient) {
+    public PRService(PRRepository repo, EjercicioService ejercicioSrv, UsuarioClient usuarioClient,
+                     PrEventPublisher eventPublisher) {
         this.repo = repo;
         this.ejercicioSrv = ejercicioSrv;
         this.usuarioClient = usuarioClient;
+        this.eventPublisher = eventPublisher;
     }
 
-    // Registra un nuevo peso levantado. Solo se guarda si supera el record anterior
-    // del usuario en ese ejercicio, o si es el primero que registra
-    
     public PR registrarIntento(Long usuarioId, Long ejercicioId, Double pesoLevantado) {
         if (!usuarioClient.usuarioExiste(usuarioId)) {
             throw new RecursoNoEncontradoException("Usuario no encontrado con id " + usuarioId);
@@ -45,10 +46,19 @@ public class PRService {
         nuevoPr.setEjercicio(ejercicio);
         nuevoPr.setPesoMaximo(pesoLevantado);
 
-        return repo.save(nuevoPr);
+        PR guardado = repo.save(nuevoPr);
+
+        // Solo se publica despues de guardar: el evento anuncia algo que ya ocurrio
+        eventPublisher.publicar(new PrBatidoEvent(
+                guardado.getUsuarioId(),
+                ejercicio.getId(),
+                ejercicio.getNombre(),
+                guardado.getPesoMaximo(),
+                String.valueOf(guardado.getFecha())));
+
+        return guardado;
     }
 
-    // Evolucion completa de PRs de un usuario
     public List<PR> historialDeUsuario(Long usuarioId) {
         if (!usuarioClient.usuarioExiste(usuarioId)) {
             throw new RecursoNoEncontradoException("Usuario no encontrado con id " + usuarioId);
